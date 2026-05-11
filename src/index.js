@@ -172,6 +172,8 @@ function helpText(ctx) {
     '/t [shell|claude] <text> - Short alias for /type.',
     '/send [shell|claude] <text> - Type text and press Enter.',
     '/s [shell|claude] <text> - Short alias for /send.',
+    '/ss <text>, /sc <text> - Send line to shell or Claude.',
+    '/ts <text>, /tc <text> - Type text to shell or Claude without Enter.',
     '/enter [shell|claude] - Short alias for /key enter.',
     '/tab, /esc, /c, /d, /up, /down, /left, /right, /bs - Common key aliases.',
     '',
@@ -358,6 +360,30 @@ bot.command('t', async (ctx) => {
   await ctx.reply('Input sent.');
 });
 
+async function typeTarget(ctx, commandName, targetName) {
+  const group = chatSessions(ctx.chat.id);
+  const target = group[targetName];
+  const text = (ctx.message?.text || '').replace(new RegExp(`^/${commandName}(@\\w+)?\\s*`, 's'), '');
+  if (!target?.running) {
+    await ctx.reply(`${targetName} PTY is not running.`);
+    return;
+  }
+  if (!text) {
+    await ctx.reply(`Usage: /${commandName} <text>`);
+    return;
+  }
+  target.write(text);
+  await ctx.reply(`Input sent to ${targetName}.`);
+}
+
+bot.command('ts', async (ctx) => {
+  await typeTarget(ctx, 'ts', 'shell');
+});
+
+bot.command('tc', async (ctx) => {
+  await typeTarget(ctx, 'tc', 'claude');
+});
+
 async function sendLine(ctx, commandName) {
   const { target, ambiguous, rest } = resolveTargetSession(ctx, ctx.message?.text || '', commandName);
   if (ambiguous) {
@@ -382,6 +408,30 @@ bot.command('send', async (ctx) => {
 
 bot.command('s', async (ctx) => {
   await sendLine(ctx, 's');
+});
+
+async function sendTargetLine(ctx, commandName, targetName) {
+  const group = chatSessions(ctx.chat.id);
+  const target = group[targetName];
+  const text = (ctx.message?.text || '').replace(new RegExp(`^/${commandName}(@\\w+)?\\s*`, 's'), '');
+  if (!target?.running) {
+    await ctx.reply(`${targetName} PTY is not running.`);
+    return;
+  }
+  if (!text) {
+    await ctx.reply(`Usage: /${commandName} <text>`);
+    return;
+  }
+  target.write(`${text}\r`);
+  await ctx.reply(`Input sent to ${targetName} with Enter.`);
+}
+
+bot.command('ss', async (ctx) => {
+  await sendTargetLine(ctx, 'ss', 'shell');
+});
+
+bot.command('sc', async (ctx) => {
+  await sendTargetLine(ctx, 'sc', 'claude');
 });
 
 bot.command('key', async (ctx) => {

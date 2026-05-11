@@ -94,6 +94,8 @@ loginctl enable-linger "$USER"
 - `/t [shell|claude] <text>` is a short alias for `/type`.
 - `/send [shell|claude] <text>` types text and presses Enter.
 - `/s [shell|claude] <text>` is a short alias for `/send`.
+- `/ss <text>` and `/sc <text>` send one line to shell or Claude.
+- `/ts <text>` and `/tc <text>` type text to shell or Claude without Enter.
 - `/enter [shell|claude]`, `/tab`, `/esc`, `/c`, `/d`, `/up`, `/down`, `/left`, `/right`, and `/bs` are short key aliases.
 
 Any normal text message is sent to the Claude PTY as a prompt, equivalent to `/ask <prompt>`.
@@ -105,6 +107,8 @@ When both shell and Claude PTY sessions are active, target input explicitly:
 /key shell enter
 /type claude please summarize this repo
 /key claude enter
+/ss y
+/sc please summarize this repo
 ```
 
 When only one PTY session is active, short aliases can omit the target:
@@ -120,5 +124,5 @@ Because `/sh` allocates a PTY, commands such as `sudo dnf update` can show an in
 
 ```text
 /sh sudo dnf update
-/s shell <password>
+/ss <password>
 ```
