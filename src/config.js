@@ -32,6 +32,12 @@ function parseInteger(name, fallback, { min, max } = {}) {
   return value;
 }
 
+function parseBoolean(name, fallback = false) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
+}
+
 function splitList(value) {
   return (value ?? '')
     .split(',')
@@ -124,6 +130,9 @@ export function loadConfig({ requireToken = true } = {}) {
     allowedWorkspaces,
     claudePermissionMode: process.env.CLAUDE_PERMISSION_MODE || 'acceptEdits',
     claudeTimeoutMs: parseInteger('CLAUDE_TIMEOUT_MS', 30 * 60 * 1000, { min: 1000 }),
+    enableShellCommands: parseBoolean('ENABLE_SHELL_COMMANDS', false),
+    shellTimeoutMs: parseInteger('SHELL_TIMEOUT_MS', 2 * 60 * 1000, { min: 1000 }),
+    shellMaxOutputChars: parseInteger('SHELL_MAX_OUTPUT_CHARS', 12000, { min: 1000, max: 100000 }),
     messageChunkSize: parseInteger('MESSAGE_CHUNK_SIZE', 3500, { min: 1000, max: 4000 }),
     stateFile,
   };
@@ -137,6 +146,8 @@ export function formatConfigSummary(config) {
     `allowed workspaces: ${config.allowedWorkspaces.join(', ')}`,
     `permission mode: ${config.claudePermissionMode}`,
     `timeout ms: ${config.claudeTimeoutMs}`,
+    `shell commands: ${config.enableShellCommands ? 'enabled' : 'disabled'}`,
+    `shell timeout ms: ${config.shellTimeoutMs}`,
     `state file: ${config.stateFile}`,
   ].join('\n');
 }

@@ -4,6 +4,8 @@ import { loadConfig, formatConfigSummary } from './config.js';
 import { StateStore } from './state-store.js';
 import { ChatQueueManager } from './chat-queue.js';
 import { listWorkspaces, resolveAllowedWorkspace } from './workspaces.js';
+import { runShell } from './shell-runner.js';
+import { replyLong, sanitizeOutput } from './messages.js';
 
 const checkConfig = process.argv.includes('--check-config');
 const config = loadConfig({ requireToken: !checkConfig });
@@ -15,6 +17,7 @@ if (checkConfig) {
 
 const store = new StateStore(config.stateFile, { defaultCwd: config.defaultCwd });
 const queueManager = new ChatQueueManager({ config, store });
+const activeShells = new Map();
 const bot = new Telegraf(config.telegramToken);
 
 function chatState(ctx) {
@@ -27,7 +30,7 @@ bot.start(async (ctx) => {
     'Claude Code bridge is running.',
     `chat: ${ctx.chat.id}`,
     `cwd: ${chat.cwd}`,
-    'Use /cwd, /status, /cancel, or send a prompt.',
+    'Use /cwd, /status, /cancel, /sh, or send a prompt.',
   ].join('\n'));
 });
 
@@ -62,22 +65,81 @@ bot.command('status', async (ctx) => {
     `session: ${chat.sessionId || '(none)'}`,
     `running: ${status.running ? 'yes' : 'no'}`,
     `queued: ${status.queued}`,
+    `shell: ${activeShells.has(String(ctx.chat.id)) ? 'running' : 'idle'}`,
     status.activeStartedAt ? `active since: ${status.activeStartedAt}` : null,
   ].filter(Boolean).join('\n'));
 });
 
 bot.command('cancel', async (ctx) => {
   const result = queueManager.cancel(ctx.chat.id);
-  if (!result.hadActive && result.dropped === 0) {
+  const shell = activeShells.get(String(ctx.chat.id));
+  if (shell) shell.cancel();
+
+  if (!result.hadActive && result.dropped === 0 && !shell) {
     await ctx.reply('Nothing to cancel.');
     return;
   }
-  await ctx.reply(`Cancel requested. Dropped queued prompts: ${result.dropped}`);
+  await ctx.reply([
+    'Cancel requested.',
+    `Dropped queued prompts: ${result.dropped}`,
+    shell ? 'Shell command: cancel requested' : null,
+  ].filter(Boolean).join('\n'));
 });
 
 bot.command('reset', async (ctx) => {
   store.clearSession(ctx.chat.id);
   await ctx.reply('Stored Claude session was cleared.');
+});
+
+bot.command('sh', async (ctx) => {
+  if (!config.enableShellCommands) {
+    await ctx.reply('Shell commands are disabled. Set ENABLE_SHELL_COMMANDS=true and restart the service to enable /sh.');
+    return;
+  }
+
+  const command = (ctx.message?.text || '').replace(/^\/sh(@\w+)?\s*/s, '').trim();
+  if (!command) {
+    await ctx.reply('Usage: /sh <command>');
+    return;
+  }
+
+  const chatId = String(ctx.chat.id);
+  if (activeShells.has(chatId)) {
+    await ctx.reply('A shell command is already running for this chat. Use /cancel to stop it.');
+    return;
+  }
+
+  const chat = chatState(ctx);
+  const startedAt = Date.now();
+  const runner = runShell({ command, cwd: chat.cwd, config });
+  activeShells.set(chatId, runner);
+
+  const typingTimer = setInterval(() => {
+    ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(() => {});
+  }, 4000);
+  typingTimer.unref();
+
+  try {
+    await ctx.reply(`Running shell command in ${chat.cwd}`);
+    const result = await runner.promise;
+    const durationMs = Date.now() - startedAt;
+    const status = result.timedOut
+      ? `timed out after ${durationMs} ms`
+      : `exit ${result.signal || result.code} in ${durationMs} ms`;
+    const output = [
+      `Command: ${command}`,
+      `Status: ${status}`,
+      result.stdout ? `stdout:\n${result.stdout}` : null,
+      result.stderr ? `stderr:\n${result.stderr}` : null,
+    ].filter(Boolean).join('\n\n');
+
+    await replyLong(ctx, sanitizeOutput(output), config.messageChunkSize);
+  } catch (error) {
+    await replyLong(ctx, sanitizeOutput(`Shell command failed:\n${error.message}`), config.messageChunkSize);
+  } finally {
+    clearInterval(typingTimer);
+    activeShells.delete(chatId);
+  }
 });
 
 bot.on('text', async (ctx) => {

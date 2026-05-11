@@ -30,6 +30,9 @@ Edit `.env` before starting the bot:
 - `DEFAULT_CWD`: initial workspace for new chats.
 - `ALLOWED_WORKSPACES`: comma-separated allowlist for `/cwd`; `*` expands one directory level.
 - `CLAUDE_PERMISSION_MODE`: defaults to `acceptEdits`.
+- `ENABLE_SHELL_COMMANDS`: enables `/sh <command>` when set to `true`.
+- `SHELL_TIMEOUT_MS`: timeout for `/sh` commands.
+- `SHELL_MAX_OUTPUT_CHARS`: maximum captured stdout/stderr characters per stream.
 - `STATE_FILE`: local chat/session state path.
 
 For installations that already have a Claude Code Telegram channel file, the token can be copied into `.env`:
@@ -41,6 +44,8 @@ chmod 600 .env
 ```
 
 Review `ALLOWED_WORKSPACES` carefully before exposing the bot. Telegram users with access to the bot can switch only to those directories, but Claude Code may edit files inside the selected workspace depending on the configured permission mode.
+
+`/sh` is disabled by default. Enabling it makes the Telegram bot token equivalent to shell access on the host user account.
 
 ## Run
 
@@ -75,5 +80,6 @@ loginctl enable-linger "$USER"
 - `/status` shows current cwd, session, and queue state.
 - `/cancel` terminates the active Claude run and clears queued prompts.
 - `/reset` forgets the stored Claude session for the chat.
+- `/sh <command>` runs a shell command in the current chat cwd when enabled.
 
 Any normal text message is queued as a Claude Code prompt.
