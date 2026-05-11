@@ -24,14 +24,39 @@ function chatState(ctx) {
   return store.getChat(ctx.chat.id);
 }
 
+function helpText(ctx) {
+  const chat = chatState(ctx);
+  return [
+    'Claude Code bridge commands',
+    '',
+    'Send any normal text message to enqueue it as a Claude Code prompt.',
+    '',
+    `Current cwd: ${chat.cwd}`,
+    `Shell commands: ${config.enableShellCommands ? 'enabled' : 'disabled'}`,
+    '',
+    '/start - Show bridge status.',
+    '/help - Show this help.',
+    '/cwd - List current cwd and allowed workspaces.',
+    '/cwd <path> - Switch cwd to an allowlisted directory or child directory.',
+    '/status - Show cwd, Claude session, queue, and shell state.',
+    '/cancel - Stop the active Claude run or shell command and clear queued prompts.',
+    '/reset - Forget the stored Claude session for this chat.',
+    '/sh <command> - Run a shell command in the current cwd when enabled.',
+  ].join('\n');
+}
+
 bot.start(async (ctx) => {
   const chat = chatState(ctx);
   await ctx.reply([
     'Claude Code bridge is running.',
     `chat: ${ctx.chat.id}`,
     `cwd: ${chat.cwd}`,
-    'Use /cwd, /status, /cancel, /sh, or send a prompt.',
+    'Use /help to list commands.',
   ].join('\n'));
+});
+
+bot.help(async (ctx) => {
+  await ctx.reply(helpText(ctx));
 });
 
 bot.command('cwd', async (ctx) => {

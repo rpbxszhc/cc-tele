@@ -75,6 +75,7 @@ loginctl enable-linger "$USER"
 ## Telegram commands
 
 - `/start` shows bot status and chat id.
+- `/help` lists available commands.
 - `/cwd` lists allowed workspaces.
 - `/cwd <name-or-path>` switches to an allowlisted workspace.
 - `/status` shows current cwd, session, and queue state.
