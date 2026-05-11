@@ -373,12 +373,26 @@ bot.catch((error, ctx) => {
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
-const me = await bot.telegram.getMe();
-console.log(`cc-tele is running as @${me.username || me.id}`);
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
-bot.launch({
-  allowedUpdates: ['message'],
-}).catch((error) => {
-  console.error('failed to launch bot', error);
-  process.exitCode = 1;
-});
+async function launchWithRetry() {
+  for (;;) {
+    try {
+      await bot.launch({
+        allowedUpdates: ['message'],
+      });
+      const me = bot.botInfo;
+      console.log(`cc-tele is running as @${me.username || me.id}`);
+      return;
+    } catch (error) {
+      console.error(`failed to launch bot, retrying in 10s: ${error.message}`);
+      await delay(10000);
+    }
+  }
+}
+
+await launchWithRetry();
