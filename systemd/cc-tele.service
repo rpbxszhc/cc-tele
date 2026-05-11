@@ -1,0 +1,16 @@
+[Unit]
+Description=Telegram bridge for Claude Code
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/z/cc-tele
+EnvironmentFile=%h/z/cc-tele/.env
+Environment=NODE_NO_WARNINGS=1
+ExecStart=/usr/bin/node %h/z/cc-tele/src/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
