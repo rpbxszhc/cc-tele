@@ -4,6 +4,8 @@ Self-hosted Telegram bridge for Claude Code. It receives Telegram Bot API update
 
 The bridge is designed for users who already run Claude Code with an Anthropic-compatible provider configuration, such as a shell file that exports `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and model variables.
 
+This is a vibe-coding project built with Codex assistance.
+
 ## Requirements
 
 - Linux with Node.js 20 or newer.
