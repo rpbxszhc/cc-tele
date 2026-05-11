@@ -88,3 +88,10 @@ loginctl enable-linger "$USER"
 Any normal text message is queued as a Claude Code prompt.
 
 Claude Code prompts run through `claude -p`, so they are non-interactive while a turn is executing. Prefer non-interactive command flags in Claude prompts. For commands that truly require stdin, run them with `/sh`, respond with `/in <text>`, and close input with `/eof` when needed.
+
+`/sh` does not allocate a TTY. Commands such as plain `sudo dnf update` cannot show an interactive password prompt. Prefer configuring a narrow `NOPASSWD` sudoers rule for exact maintenance commands. If password input over Telegram is acceptable for a private deployment, use `sudo -S` and send the password with `/in`, for example:
+
+```text
+/sh sudo -S dnf -y update
+/in <password>
+```

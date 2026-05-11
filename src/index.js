@@ -47,6 +47,22 @@ function helpText(ctx) {
   ].join('\n');
 }
 
+function shellUsageHint(result) {
+  const combined = `${result.stdout || ''}\n${result.stderr || ''}`.toLowerCase();
+  if (!combined.includes('sudo:')) return null;
+  if (!combined.includes('a terminal is required') && !combined.includes('a password is required')) {
+    return null;
+  }
+
+  return [
+    'Hint: /sh does not allocate a TTY, so plain sudo cannot prompt for a password.',
+    'Prefer a narrow NOPASSWD sudoers rule for exact maintenance commands.',
+    'If the risk is acceptable, sudo can read from stdin with -S, for example:',
+    '/sh sudo -S dnf -y update',
+    'Then send the password with /in <password>. Avoid doing this in shared chats.',
+  ].join('\n');
+}
+
 bot.start(async (ctx) => {
   const chat = chatState(ctx);
   await ctx.reply([
@@ -158,6 +174,7 @@ bot.command('sh', async (ctx) => {
       `Status: ${status}`,
       result.stdout ? `stdout:\n${result.stdout}` : null,
       result.stderr ? `stderr:\n${result.stderr}` : null,
+      shellUsageHint(result),
     ].filter(Boolean).join('\n\n');
 
     await replyLong(ctx, sanitizeOutput(output), config.messageChunkSize);
