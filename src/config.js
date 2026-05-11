@@ -130,9 +130,12 @@ export function loadConfig({ requireToken = true } = {}) {
     allowedWorkspaces,
     claudePermissionMode: process.env.CLAUDE_PERMISSION_MODE || 'acceptEdits',
     claudeTimeoutMs: parseInteger('CLAUDE_TIMEOUT_MS', 30 * 60 * 1000, { min: 1000 }),
+    enablePty: parseBoolean('ENABLE_PTY', true),
     enableShellCommands: parseBoolean('ENABLE_SHELL_COMMANDS', false),
-    shellTimeoutMs: parseInteger('SHELL_TIMEOUT_MS', 2 * 60 * 1000, { min: 1000 }),
-    shellMaxOutputChars: parseInteger('SHELL_MAX_OUTPUT_CHARS', 12000, { min: 1000, max: 100000 }),
+    ptyOutputIntervalMs: parseInteger('PTY_OUTPUT_INTERVAL_MS', 1200, { min: 250 }),
+    ptyScreenLines: parseInteger('PTY_SCREEN_LINES', 80, { min: 5, max: 500 }),
+    ptyIdleTimeoutMs: parseInteger('PTY_IDLE_TIMEOUT_MS', 30 * 60 * 1000, { min: 0 }),
+    ptyHardTimeoutMs: parseInteger('PTY_HARD_TIMEOUT_MS', 0, { min: 0 }),
     messageChunkSize: parseInteger('MESSAGE_CHUNK_SIZE', 3500, { min: 1000, max: 4000 }),
     stateFile,
   };
@@ -146,8 +149,11 @@ export function formatConfigSummary(config) {
     `allowed workspaces: ${config.allowedWorkspaces.join(', ')}`,
     `permission mode: ${config.claudePermissionMode}`,
     `timeout ms: ${config.claudeTimeoutMs}`,
+    `pty: ${config.enablePty ? 'enabled' : 'disabled'}`,
+    `pty output interval ms: ${config.ptyOutputIntervalMs}`,
+    `pty screen lines: ${config.ptyScreenLines}`,
+    `pty idle timeout ms: ${config.ptyIdleTimeoutMs}`,
     `shell commands: ${config.enableShellCommands ? 'enabled' : 'disabled'}`,
-    `shell timeout ms: ${config.shellTimeoutMs}`,
     `state file: ${config.stateFile}`,
   ].join('\n');
 }
