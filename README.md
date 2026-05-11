@@ -92,6 +92,8 @@ loginctl enable-linger "$USER"
 - `/key [shell|claude] <key>` sends a terminal key such as `enter`, `tab`, `ctrl-c`, `ctrl-d`, arrows, or `backspace`.
 - `/eof [shell|claude]` sends Ctrl-D to a PTY session.
 - `/t [shell|claude] <text>` is a short alias for `/type`.
+- `/send [shell|claude] <text>` types text and presses Enter.
+- `/s [shell|claude] <text>` is a short alias for `/send`.
 - `/enter [shell|claude]`, `/tab`, `/esc`, `/c`, `/d`, `/up`, `/down`, `/left`, `/right`, and `/bs` are short key aliases.
 
 Any normal text message is sent to the Claude PTY as a prompt, equivalent to `/ask <prompt>`.
@@ -111,12 +113,12 @@ When only one PTY session is active, short aliases can omit the target:
 /enter
 /t y
 /enter
+/s y
 ```
 
 Because `/sh` allocates a PTY, commands such as `sudo dnf update` can show an interactive password prompt. For private deployments, enter a password with `/type` and `/key enter`; avoid doing this in shared chats or group chats. A narrow `NOPASSWD` sudoers rule for exact maintenance commands is safer.
 
 ```text
 /sh sudo dnf update
-/type shell <password>
-/key shell enter
+/s shell <password>
 ```

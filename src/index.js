@@ -170,6 +170,8 @@ function helpText(ctx) {
     '/key [shell|claude] <key> - Send a terminal key.',
     '/eof [shell|claude] - Send Ctrl-D to a PTY.',
     '/t [shell|claude] <text> - Short alias for /type.',
+    '/send [shell|claude] <text> - Type text and press Enter.',
+    '/s [shell|claude] <text> - Short alias for /send.',
     '/enter [shell|claude] - Short alias for /key enter.',
     '/tab, /esc, /c, /d, /up, /down, /left, /right, /bs - Common key aliases.',
     '',
@@ -354,6 +356,32 @@ bot.command('t', async (ctx) => {
   }
   target.write(rest);
   await ctx.reply('Input sent.');
+});
+
+async function sendLine(ctx, commandName) {
+  const { target, ambiguous, rest } = resolveTargetSession(ctx, ctx.message?.text || '', commandName);
+  if (ambiguous) {
+    await ctx.reply(`Both shell and Claude PTY are running. Use /${commandName} shell <text> or /${commandName} claude <text>.`);
+    return;
+  }
+  if (!target?.running) {
+    await ctx.reply('No active PTY target. Start /claude or /sh first.');
+    return;
+  }
+  if (!rest) {
+    await ctx.reply(`Usage: /${commandName} [shell|claude] <text>`);
+    return;
+  }
+  target.write(`${rest}\r`);
+  await ctx.reply('Input sent with Enter.');
+}
+
+bot.command('send', async (ctx) => {
+  await sendLine(ctx, 'send');
+});
+
+bot.command('s', async (ctx) => {
+  await sendLine(ctx, 's');
 });
 
 bot.command('key', async (ctx) => {
