@@ -165,6 +165,7 @@ function helpText(ctx) {
     '/claude - Start an interactive Claude Code PTY.',
     '/ask <prompt> - Send a prompt plus Enter to Claude PTY.',
     '/sh <command> - Run a shell command in a shell PTY when enabled.',
+    '/screen [shell|claude] - Send the latest PTY screen as a new message.',
     '/type [shell|claude] <text> - Send raw text to a PTY.',
     '/key [shell|claude] <key> - Send a terminal key.',
     '/eof [shell|claude] - Send Ctrl-D to a PTY.',
@@ -301,6 +302,19 @@ bot.command('sh', async (ctx) => {
   const session = createShellPty({ command, cwd: chat.cwd, config });
   group.shell = session;
   await attachSession(ctx, session);
+});
+
+bot.command('screen', async (ctx) => {
+  const { target, ambiguous } = resolveTargetSession(ctx, ctx.message?.text || '', 'screen');
+  if (ambiguous) {
+    await ctx.reply('Both shell and Claude PTY are running. Use /screen shell or /screen claude.');
+    return;
+  }
+  if (!target) {
+    await ctx.reply('No PTY target found. Use /screen shell or /screen claude after starting a session.');
+    return;
+  }
+  await ctx.reply(sessionText(target));
 });
 
 bot.command('type', async (ctx) => {

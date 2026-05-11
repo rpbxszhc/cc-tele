@@ -87,6 +87,7 @@ loginctl enable-linger "$USER"
 - `/claude` starts an interactive Claude Code PTY.
 - `/ask <prompt>` sends a prompt plus Enter to the Claude PTY.
 - `/sh <command>` runs a shell command in the current chat cwd when enabled.
+- `/screen [shell|claude]` sends the latest PTY screen as a new message.
 - `/type [shell|claude] <text>` sends raw text to a PTY session.
 - `/key [shell|claude] <key>` sends a terminal key such as `enter`, `tab`, `ctrl-c`, `ctrl-d`, arrows, or `backspace`.
 - `/eof [shell|claude]` sends Ctrl-D to a PTY session.
