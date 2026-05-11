@@ -12,22 +12,46 @@ export function listWorkspaces(config) {
   }));
 }
 
-export function resolveAllowedWorkspace(input, config) {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
+function isInsideWorkspace(candidate, workspace) {
+  const relative = path.relative(workspace, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
 
-  const byLabel = config.allowedWorkspaces.find((workspace) => workspaceLabel(workspace) === trimmed);
-  if (byLabel) return byLabel;
-
-  const byPath = config.allowedWorkspaces.find((workspace) => workspace === trimmed);
-  if (byPath) return byPath;
-
-  let realInput;
+function existingRealDirectory(input) {
   try {
-    realInput = fs.realpathSync(path.resolve(trimmed));
+    const realInput = fs.realpathSync(path.resolve(input));
+    return fs.statSync(realInput).isDirectory() ? realInput : null;
   } catch {
     return null;
   }
+}
 
-  return config.allowedWorkspaces.find((workspace) => workspace === realInput) || null;
+function resolveLabelPath(input, config) {
+  const [label, ...rest] = input.split(/[\\/]+/).filter(Boolean);
+  if (!label) return null;
+
+  const root = config.allowedWorkspaces.find((workspace) => workspaceLabel(workspace) === label);
+  if (!root) return null;
+
+  return existingRealDirectory(path.join(root, ...rest));
+}
+
+export function resolveAllowedWorkspace(input, config, currentCwd = config.defaultCwd) {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const byLabelPath = resolveLabelPath(trimmed, config);
+  if (byLabelPath && config.allowedWorkspaces.some((workspace) => isInsideWorkspace(byLabelPath, workspace))) {
+    return byLabelPath;
+  }
+
+  const rawCandidate = path.isAbsolute(trimmed) ? trimmed : path.resolve(currentCwd, trimmed);
+  const realCandidate = existingRealDirectory(rawCandidate);
+  if (!realCandidate) return null;
+
+  if (config.allowedWorkspaces.some((workspace) => isInsideWorkspace(realCandidate, workspace))) {
+    return realCandidate;
+  }
+
+  return null;
 }

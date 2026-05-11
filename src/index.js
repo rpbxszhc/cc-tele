@@ -44,7 +44,7 @@ bot.command('cwd', async (ctx) => {
     return;
   }
 
-  const workspace = resolveAllowedWorkspace(requested, config);
+  const workspace = resolveAllowedWorkspace(requested, config, chatState(ctx).cwd);
   if (!workspace) {
     await ctx.reply('Rejected: that path is not in ALLOWED_WORKSPACES.');
     return;
