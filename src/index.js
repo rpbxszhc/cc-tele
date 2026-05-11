@@ -169,6 +169,9 @@ function helpText(ctx) {
     '/type [shell|claude] <text> - Send raw text to a PTY.',
     '/key [shell|claude] <key> - Send a terminal key.',
     '/eof [shell|claude] - Send Ctrl-D to a PTY.',
+    '/t [shell|claude] <text> - Short alias for /type.',
+    '/enter [shell|claude] - Short alias for /key enter.',
+    '/tab, /esc, /c, /d, /up, /down, /left, /right, /bs - Common key aliases.',
     '',
     `Keys: ${supportedKeys().join(', ')}`,
   ].join('\n');
@@ -335,6 +338,24 @@ bot.command('type', async (ctx) => {
   await ctx.reply('Input sent.');
 });
 
+bot.command('t', async (ctx) => {
+  const { target, ambiguous, rest } = resolveTargetSession(ctx, ctx.message?.text || '', 't');
+  if (ambiguous) {
+    await ctx.reply('Both shell and Claude PTY are running. Use /t shell <text> or /t claude <text>.');
+    return;
+  }
+  if (!target?.running) {
+    await ctx.reply('No active PTY target. Start /claude or /sh first.');
+    return;
+  }
+  if (!rest) {
+    await ctx.reply('Usage: /t [shell|claude] <text>');
+    return;
+  }
+  target.write(rest);
+  await ctx.reply('Input sent.');
+});
+
 bot.command('key', async (ctx) => {
   const { target, ambiguous, rest } = resolveTargetSession(ctx, ctx.message?.text || '', 'key');
   if (ambiguous) {
@@ -353,6 +374,36 @@ bot.command('key', async (ctx) => {
   }
   await ctx.reply(`Key sent: ${key}`);
 });
+
+function registerKeyAlias(command, key, label = key) {
+  bot.command(command, async (ctx) => {
+    const { target, ambiguous } = resolveTargetSession(ctx, ctx.message?.text || '', command);
+    if (ambiguous) {
+      await ctx.reply(`Both shell and Claude PTY are running. Use /${command} shell or /${command} claude.`);
+      return;
+    }
+    if (!target?.running) {
+      await ctx.reply('No active PTY target. Start /claude or /sh first.');
+      return;
+    }
+    if (!target.key(key)) {
+      await ctx.reply(`Unsupported key: ${key}`);
+      return;
+    }
+    await ctx.reply(`Key sent: ${label}`);
+  });
+}
+
+registerKeyAlias('enter', 'enter');
+registerKeyAlias('tab', 'tab');
+registerKeyAlias('esc', 'esc');
+registerKeyAlias('c', 'ctrl-c');
+registerKeyAlias('d', 'ctrl-d');
+registerKeyAlias('up', 'up');
+registerKeyAlias('down', 'down');
+registerKeyAlias('left', 'left');
+registerKeyAlias('right', 'right');
+registerKeyAlias('bs', 'backspace', 'backspace');
 
 bot.command('eof', async (ctx) => {
   const { target, ambiguous } = resolveTargetSession(ctx, ctx.message?.text || '', 'eof');
