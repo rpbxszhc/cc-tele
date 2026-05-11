@@ -47,7 +47,14 @@ function truncateMiddle(text, maxLength) {
   return `[truncated ${text.length - keep} chars]\n${text.slice(text.length - keep)}`;
 }
 
-function sessionText(session) {
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function sessionPlainText(session) {
   const exitValue = session.exitInfo?.signal ?? session.exitInfo?.code ?? 'unknown';
   const status = session.running
     ? `running for ${uptime(session.startedAt)}`
@@ -62,6 +69,10 @@ function sessionText(session) {
   return truncateMiddle(`${header}\n${body}`, config.messageChunkSize);
 }
 
+function sessionText(session) {
+  return `<pre>${escapeHtml(sessionPlainText(session))}</pre>`;
+}
+
 async function renderSession(ctx, session, force = false) {
   if (force && session.renderTimer) {
     clearTimeout(session.renderTimer);
@@ -74,13 +85,13 @@ async function renderSession(ctx, session, force = false) {
     const text = sessionText(session);
     try {
       if (session.messageId) {
-        await ctx.telegram.editMessageText(ctx.chat.id, session.messageId, undefined, text);
+        await ctx.telegram.editMessageText(ctx.chat.id, session.messageId, undefined, text, { parse_mode: 'HTML' });
       } else {
-        const message = await ctx.reply(text);
+        const message = await ctx.reply(text, { parse_mode: 'HTML' });
         session.messageId = message.message_id;
       }
     } catch {
-      const message = await ctx.reply(text);
+      const message = await ctx.reply(text, { parse_mode: 'HTML' });
       session.messageId = message.message_id;
     }
   }, delay);
@@ -97,7 +108,7 @@ async function attachSession(ctx, session) {
   session.on('error', async (error) => {
     await ctx.reply(`PTY error: ${error.message}`);
   });
-  const message = await ctx.reply(sessionText(session));
+  const message = await ctx.reply(sessionText(session), { parse_mode: 'HTML' });
   session.messageId = message.message_id;
 }
 
@@ -321,7 +332,7 @@ bot.command('screen', async (ctx) => {
     await ctx.reply('No PTY target found. Use /screen shell or /screen claude after starting a session.');
     return;
   }
-  await ctx.reply(sessionText(target));
+  await ctx.reply(sessionText(target), { parse_mode: 'HTML' });
 });
 
 bot.command('type', async (ctx) => {

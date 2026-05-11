@@ -29,7 +29,7 @@ Edit `.env` before starting the bot:
 - `CLAUDE_ENV_FILE`: shell file sourced before each `claude` run.
 - `DEFAULT_CWD`: initial workspace for new chats.
 - `ALLOWED_WORKSPACES`: comma-separated allowlist for `/cwd`; `*` expands one directory level.
-- `CLAUDE_PERMISSION_MODE`: defaults to `acceptEdits`.
+- `CLAUDE_PERMISSION_MODE`: defaults to `auto`.
 - `ENABLE_PTY`: enables PTY-backed shell and Claude sessions.
 - `PTY_OUTPUT_INTERVAL_MS`: throttle interval for Telegram message edits.
 - `PTY_SCREEN_LINES`: number of terminal output lines retained in Telegram.
@@ -49,6 +49,8 @@ chmod 600 .env
 Review `ALLOWED_WORKSPACES` carefully before exposing the bot. Telegram users with access to the bot can switch only to those directories, but Claude Code and PTY shell commands may edit files inside the selected workspace depending on the configured permission mode and shell access.
 
 PTY mode makes Telegram bot access equivalent to interactive terminal access on the host user account. `/sh` is disabled by default; enabling it allows arbitrary shell commands from Telegram.
+
+PTY output is rendered as a terminal screen and sent in a Telegram preformatted block. This keeps cursor-positioned interfaces such as Claude Code much more readable than appending raw PTY output, though complex full-screen TUIs may still be easier to use from a real terminal.
 
 ## Run
 

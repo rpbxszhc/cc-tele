@@ -18,32 +18,217 @@ const KEY_BYTES = {
   backspace: '\x7f',
 };
 
-function stripAnsi(value) {
-  return value
-    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
-    .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, '')
-    .replace(/\x1b[()][A-Za-z0-9]/g, '')
-    .replace(/\x1b[=>78]/g, '')
-    .replace(/\x1b./g, '');
-}
-
-function normalizeTerminalText(value) {
-  return stripAnsi(value)
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/[^\S\n]+$/gm, '');
-}
-
-function appendScreen(current, chunk, maxLines) {
-  const next = normalizeTerminalText(current + chunk);
-  const lines = next.split('\n');
-  return lines.slice(Math.max(0, lines.length - maxLines)).join('\n');
-}
-
 function childEnv(extra = {}) {
   const env = { ...process.env, ...extra };
   delete env.TELEGRAM_BOT_TOKEN;
   return env;
+}
+
+class TerminalScreen {
+  constructor({ rows = 30, cols = 100, maxLines = 80 } = {}) {
+    this.rows = rows;
+    this.cols = cols;
+    this.maxLines = maxLines;
+    this.lines = [''];
+    this.row = 0;
+    this.col = 0;
+    this.savedRow = 0;
+    this.savedCol = 0;
+    this.state = 'text';
+    this.escape = '';
+    this.osc = '';
+  }
+
+  write(chunk) {
+    for (const char of chunk) {
+      this.#process(char);
+    }
+    this.#trimHistory();
+  }
+
+  toString() {
+    return this.lines
+      .slice(Math.max(0, this.lines.length - this.maxLines))
+      .map((line) => line.replace(/[^\S\n]+$/g, ''))
+      .join('\n')
+      .replace(/\n+$/g, '');
+  }
+
+  #process(char) {
+    if (this.state === 'osc') {
+      if (char === '\x07') {
+        this.state = 'text';
+        this.osc = '';
+      } else {
+        this.osc += char;
+        if (this.osc.endsWith('\x1b\\')) {
+          this.state = 'text';
+          this.osc = '';
+        }
+      }
+      return;
+    }
+
+    if (this.state === 'escape') {
+      this.escape += char;
+      if (this.escape === ']') {
+        this.state = 'osc';
+        this.osc = '';
+        return;
+      }
+      if (this.escape === '7') {
+        this.savedRow = this.row;
+        this.savedCol = this.col;
+        this.state = 'text';
+        this.escape = '';
+        return;
+      }
+      if (this.escape === '8') {
+        this.row = this.savedRow;
+        this.col = this.savedCol;
+        this.state = 'text';
+        this.escape = '';
+        return;
+      }
+      if (this.escape === '[') return;
+      if (this.escape.startsWith('[')) {
+        if (this.escape.length > 1 && /[@-~]$/.test(this.escape)) {
+          this.#handleCsi(this.escape.slice(1, -1), this.escape.at(-1));
+          this.state = 'text';
+          this.escape = '';
+        }
+        return;
+      }
+      if (this.escape.length >= 2 || /^[=>c]$/.test(this.escape)) {
+        this.state = 'text';
+        this.escape = '';
+      }
+      return;
+    }
+
+    if (char === '\x1b') {
+      this.state = 'escape';
+      this.escape = '';
+      return;
+    }
+    if (char === '\r') {
+      this.col = 0;
+      return;
+    }
+    if (char === '\n') {
+      this.row += 1;
+      this.#ensureLine();
+      return;
+    }
+    if (char === '\b' || char === '\x7f') {
+      this.col = Math.max(0, this.col - 1);
+      return;
+    }
+    if (char === '\t') {
+      const spaces = 8 - (this.col % 8);
+      for (let index = 0; index < spaces; index += 1) this.#putChar(' ');
+      return;
+    }
+    if (char < ' ' && char !== '\u00a0') return;
+    this.#putChar(char);
+  }
+
+  #putChar(char) {
+    this.#ensureLine();
+    const chars = Array.from(this.lines[this.row]);
+    while (chars.length < this.col) chars.push(' ');
+    chars[this.col] = char;
+    this.lines[this.row] = chars.join('');
+    this.col += 1;
+    if (this.col >= this.cols) {
+      this.col = 0;
+      this.row += 1;
+      this.#ensureLine();
+    }
+  }
+
+  #ensureLine() {
+    while (this.lines.length <= this.row) this.lines.push('');
+  }
+
+  #trimHistory() {
+    const limit = Math.max(this.maxLines, this.rows) * 3;
+    if (this.lines.length <= limit) return;
+    const removeCount = this.lines.length - limit;
+    this.lines.splice(0, removeCount);
+    this.row = Math.max(0, this.row - removeCount);
+    this.savedRow = Math.max(0, this.savedRow - removeCount);
+  }
+
+  #params(raw) {
+    const clean = raw.replace(/[?=><]/g, '');
+    return clean.split(';').map((value) => {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    });
+  }
+
+  #handleCsi(raw, final) {
+    const params = this.#params(raw);
+    const first = params[0] || 1;
+    if (final === 'A') this.row = Math.max(0, this.row - first);
+    else if (final === 'B') this.row += first;
+    else if (final === 'C') this.col = Math.min(this.cols - 1, this.col + first);
+    else if (final === 'D') this.col = Math.max(0, this.col - first);
+    else if (final === 'E') {
+      this.row += first;
+      this.col = 0;
+    } else if (final === 'F') {
+      this.row = Math.max(0, this.row - first);
+      this.col = 0;
+    } else if (final === 'G') {
+      this.col = Math.max(0, first - 1);
+    } else if (final === 'H' || final === 'f') {
+      this.row = Math.max(0, (params[0] || 1) - 1);
+      this.col = Math.max(0, (params[1] || 1) - 1);
+    } else if (final === 'J') {
+      this.#eraseDisplay(params[0] || 0);
+    } else if (final === 'K') {
+      this.#eraseLine(params[0] || 0);
+    } else if (final === 'S') {
+      this.lines.splice(0, first);
+      this.row = Math.max(0, this.row - first);
+    } else if (final === 'T') {
+      for (let index = 0; index < first; index += 1) this.lines.unshift('');
+      this.row += first;
+    }
+    this.#ensureLine();
+  }
+
+  #eraseDisplay(mode) {
+    this.#ensureLine();
+    if (mode === 2 || mode === 3) {
+      this.lines = [''];
+      this.row = 0;
+      this.col = 0;
+      return;
+    }
+    if (mode === 0) {
+      this.lines[this.row] = Array.from(this.lines[this.row]).slice(0, this.col).join('');
+      this.lines.splice(this.row + 1);
+    } else if (mode === 1) {
+      for (let index = 0; index < this.row; index += 1) this.lines[index] = '';
+      this.lines[this.row] = Array.from(this.lines[this.row]).slice(this.col).join('');
+    }
+  }
+
+  #eraseLine(mode) {
+    this.#ensureLine();
+    const chars = Array.from(this.lines[this.row]);
+    if (mode === 2) {
+      this.lines[this.row] = '';
+    } else if (mode === 1) {
+      this.lines[this.row] = chars.slice(this.col).join('');
+      this.col = 0;
+    } else {
+      this.lines[this.row] = chars.slice(0, this.col).join('');
+    }
+  }
 }
 
 export function keySequence(key) {
@@ -69,6 +254,11 @@ export class PtySession extends EventEmitter {
     this.idleTimer = null;
     this.hardTimer = null;
     this.lineBuffer = '';
+    this.terminal = new TerminalScreen({
+      rows: 30,
+      cols: 100,
+      maxLines: config.ptyScreenLines,
+    });
 
     this.child = spawn('python3', [
       HELPER_PATH,
@@ -163,7 +353,8 @@ export class PtySession extends EventEmitter {
   }
 
   #appendOutput(chunk) {
-    this.screen = appendScreen(this.screen, chunk, this.config.ptyScreenLines);
+    this.terminal.write(chunk);
+    this.screen = this.terminal.toString();
     this.#armIdleTimer();
     this.emit('output', this.screen);
   }
@@ -202,6 +393,8 @@ export function createClaudePty({ cwd, config }) {
     env: {
       CLAUDE_ENV_FILE: config.claudeEnvFile,
       CLAUDE_PERMISSION_MODE: config.claudePermissionMode,
+      NO_COLOR: '1',
+      FORCE_COLOR: '0',
     },
     config,
   });

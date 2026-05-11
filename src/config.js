@@ -128,7 +128,7 @@ export function loadConfig({ requireToken = true } = {}) {
     claudeEnvFile,
     defaultCwd,
     allowedWorkspaces,
-    claudePermissionMode: process.env.CLAUDE_PERMISSION_MODE || 'acceptEdits',
+    claudePermissionMode: process.env.CLAUDE_PERMISSION_MODE || 'auto',
     claudeTimeoutMs: parseInteger('CLAUDE_TIMEOUT_MS', 30 * 60 * 1000, { min: 1000 }),
     enablePty: parseBoolean('ENABLE_PTY', true),
     enableShellCommands: parseBoolean('ENABLE_SHELL_COMMANDS', false),
