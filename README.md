@@ -1,18 +1,36 @@
 # cc-tele
 
-Self-hosted Telegram bridge for Claude Code on Fedora. It uses the local `claude` CLI and sources `~/.claude.sh`, so your Anthropic-compatible provider config can stay in one place.
+Self-hosted Telegram bridge for Claude Code. It receives Telegram Bot API updates by long polling, runs the local `claude` CLI, and returns Claude Code results back to Telegram.
+
+The bridge is designed for users who already run Claude Code with an Anthropic-compatible provider configuration, such as a shell file that exports `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and model variables.
+
+## Requirements
+
+- Linux with Node.js 20 or newer.
+- Claude Code installed and available as `claude`.
+- A Telegram bot token from BotFather.
+- A provider environment file, defaulting to `~/.claude.sh`.
 
 ## Setup
 
 ```bash
-git clone <your-repo-url> ~/z/cc-tele
-cd ~/z/cc-tele
+git clone https://github.com/rpbxszhc/cc-tele.git
+cd cc-tele
 npm install
 cp config.example.env .env
 chmod 600 .env
 ```
 
-If you already configured the official Telegram channel, reuse its token:
+Edit `.env` before starting the bot:
+
+- `TELEGRAM_BOT_TOKEN`: Telegram bot token.
+- `CLAUDE_ENV_FILE`: shell file sourced before each `claude` run.
+- `DEFAULT_CWD`: initial workspace for new chats.
+- `ALLOWED_WORKSPACES`: comma-separated allowlist for `/cwd`; `*` expands one directory level.
+- `CLAUDE_PERMISSION_MODE`: defaults to `acceptEdits`.
+- `STATE_FILE`: local chat/session state path.
+
+For installations that already have a Claude Code Telegram channel file, the token can be copied into `.env`:
 
 ```bash
 grep '^TELEGRAM_BOT_TOKEN=' ~/.claude/channels/telegram/.env > .env
@@ -20,7 +38,7 @@ cat config.example.env | grep -v '^TELEGRAM_BOT_TOKEN=' >> .env
 chmod 600 .env
 ```
 
-Edit `ALLOWED_WORKSPACES` before exposing the bot. `/cwd` can switch only to those directories.
+Review `ALLOWED_WORKSPACES` carefully before exposing the bot. Telegram users with access to the bot can switch only to those directories, but Claude Code may edit files inside the selected workspace depending on the configured permission mode.
 
 ## Run
 
@@ -31,6 +49,8 @@ npm start
 
 ## systemd user service
 
+The included unit assumes the repository is installed at `~/z/cc-tele`. For another location, edit `WorkingDirectory`, `EnvironmentFile`, and `ExecStart` before enabling the service.
+
 ```bash
 mkdir -p ~/.config/systemd/user
 cp ~/z/cc-tele/systemd/cc-tele.service ~/.config/systemd/user/
@@ -39,9 +59,7 @@ systemctl --user enable --now cc-tele.service
 journalctl --user -u cc-tele.service -f
 ```
 
-The included unit assumes the repo lives at `~/z/cc-tele`. If you clone it elsewhere, edit `WorkingDirectory`, `EnvironmentFile`, and `ExecStart` before enabling the service.
-
-To keep it running after logout:
+To keep a user service running after logout:
 
 ```bash
 loginctl enable-linger "$USER"
