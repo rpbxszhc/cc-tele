@@ -42,6 +42,8 @@ function helpText(ctx) {
     '/cancel - Stop the active Claude run or shell command and clear queued prompts.',
     '/reset - Forget the stored Claude session for this chat.',
     '/sh <command> - Run a shell command in the current cwd when enabled.',
+    '/in <text> - Send one line of input to the active shell command.',
+    '/eof - Close stdin for the active shell command.',
   ].join('\n');
 }
 
@@ -165,6 +167,40 @@ bot.command('sh', async (ctx) => {
     clearInterval(typingTimer);
     activeShells.delete(chatId);
   }
+});
+
+bot.command('in', async (ctx) => {
+  const shell = activeShells.get(String(ctx.chat.id));
+  if (!shell) {
+    await ctx.reply('No shell command is waiting for input.');
+    return;
+  }
+
+  const input = (ctx.message?.text || '').replace(/^\/in(@\w+)?\s*/s, '');
+  if (!input) {
+    await ctx.reply('Usage: /in <text>');
+    return;
+  }
+
+  if (!shell.writeInput(`${input}\n`)) {
+    await ctx.reply('Shell stdin is no longer available.');
+    return;
+  }
+  await ctx.reply('Input sent.');
+});
+
+bot.command('eof', async (ctx) => {
+  const shell = activeShells.get(String(ctx.chat.id));
+  if (!shell) {
+    await ctx.reply('No shell command is running.');
+    return;
+  }
+
+  if (!shell.endInput()) {
+    await ctx.reply('Shell stdin is already closed.');
+    return;
+  }
+  await ctx.reply('stdin closed.');
 });
 
 bot.on('text', async (ctx) => {

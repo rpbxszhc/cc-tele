@@ -82,5 +82,9 @@ loginctl enable-linger "$USER"
 - `/cancel` terminates the active Claude run and clears queued prompts.
 - `/reset` forgets the stored Claude session for the chat.
 - `/sh <command>` runs a shell command in the current chat cwd when enabled.
+- `/in <text>` sends one input line to the active shell command.
+- `/eof` closes stdin for the active shell command.
 
 Any normal text message is queued as a Claude Code prompt.
+
+Claude Code prompts run through `claude -p`, so they are non-interactive while a turn is executing. Prefer non-interactive command flags in Claude prompts. For commands that truly require stdin, run them with `/sh`, respond with `/in <text>`, and close input with `/eof` when needed.

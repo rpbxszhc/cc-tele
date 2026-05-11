@@ -13,7 +13,7 @@ export function runShell({ command, cwd, config }) {
   const child = spawn('bash', ['-lc', command], {
     cwd,
     env: childEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
 
   let stdout = '';
@@ -62,6 +62,16 @@ export function runShell({ command, cwd, config }) {
   return {
     child,
     promise,
+    writeInput(input) {
+      if (child.exitCode !== null || child.stdin.destroyed) return false;
+      child.stdin.write(input);
+      return true;
+    },
+    endInput() {
+      if (child.exitCode !== null || child.stdin.destroyed) return false;
+      child.stdin.end();
+      return true;
+    },
     cancel() {
       if (child.exitCode === null) child.kill('SIGTERM');
     },
