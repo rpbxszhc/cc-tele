@@ -88,8 +88,6 @@ async function renderSession(ctx, session, force = false) {
 }
 
 async function attachSession(ctx, session) {
-  const message = await ctx.reply(sessionText(session));
-  session.messageId = message.message_id;
   session.on('output', () => {
     void renderSession(ctx, session);
   });
@@ -99,6 +97,8 @@ async function attachSession(ctx, session) {
   session.on('error', async (error) => {
     await ctx.reply(`PTY error: ${error.message}`);
   });
+  const message = await ctx.reply(sessionText(session));
+  session.messageId = message.message_id;
 }
 
 function stopSession(session) {
