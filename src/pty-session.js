@@ -54,6 +54,12 @@ class TerminalScreen {
       .replace(/\n+$/g, '');
   }
 
+  resize({ rows, cols }) {
+    this.rows = rows;
+    this.cols = cols;
+    if (this.col >= this.cols) this.col = this.cols - 1;
+  }
+
   #process(char) {
     if (this.state === 'osc') {
       if (char === '\x07') {
@@ -254,9 +260,11 @@ export class PtySession extends EventEmitter {
     this.idleTimer = null;
     this.hardTimer = null;
     this.lineBuffer = '';
+    this.rows = config.ptyRows;
+    this.cols = config.ptyCols;
     this.terminal = new TerminalScreen({
-      rows: 30,
-      cols: 100,
+      rows: this.rows,
+      cols: this.cols,
       maxLines: config.ptyScreenLines,
     });
 
@@ -265,14 +273,18 @@ export class PtySession extends EventEmitter {
       '--cwd',
       cwd,
       '--rows',
-      '30',
+      String(this.rows),
       '--cols',
-      '100',
+      String(this.cols),
       '--',
       ...argv,
     ], {
       cwd: path.dirname(HELPER_PATH),
-      env: childEnv(env),
+      env: childEnv({
+        ...env,
+        COLUMNS: String(this.cols),
+        LINES: String(this.rows),
+      }),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -313,6 +325,17 @@ export class PtySession extends EventEmitter {
 
   eof() {
     return this.key('ctrl-d');
+  }
+
+  resize({ rows = this.rows, cols = this.cols } = {}) {
+    if (!this.running || this.child.stdin.destroyed) return false;
+    this.rows = rows;
+    this.cols = cols;
+    this.terminal.resize({ rows, cols });
+    this.child.stdin.write(`${JSON.stringify({ type: 'resize', rows, cols })}\n`);
+    this.screen = this.terminal.toString();
+    this.emit('output', this.screen);
+    return true;
   }
 
   terminate() {

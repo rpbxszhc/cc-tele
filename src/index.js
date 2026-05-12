@@ -47,6 +47,12 @@ function truncateMiddle(text, maxLength) {
   return `[truncated ${text.length - keep} chars]\n${text.slice(text.length - keep)}`;
 }
 
+function parseBoundedInteger(raw, { min, max }) {
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value < min || value > max) return null;
+  return value;
+}
+
 function escapeHtml(text) {
   return text
     .replace(/&/g, '&amp;')
@@ -63,6 +69,7 @@ function sessionPlainText(session) {
     `${session.kind} PTY: ${status}`,
     `cwd: ${session.cwd}`,
     `command: ${session.label}`,
+    `size: ${session.cols}x${session.rows}`,
     '---',
   ].join('\n');
   const body = sanitizeOutput(session.screen || '(no output yet)');
@@ -177,6 +184,7 @@ function helpText(ctx) {
     '/ask <prompt> - Send a prompt plus Enter to Claude PTY.',
     '/sh <command> - Run a shell command in a shell PTY when enabled.',
     '/screen [shell|claude] - Send the latest PTY screen as a new message.',
+    '/resize [shell|claude] <cols> [rows] - Resize a running PTY.',
     '/type [shell|claude] <text> - Send raw text to a PTY.',
     '/key [shell|claude] <key> - Send a terminal key.',
     '/eof [shell|claude] - Send Ctrl-D to a PTY.',
@@ -333,6 +341,30 @@ bot.command('screen', async (ctx) => {
     return;
   }
   await ctx.reply(sessionText(target), { parse_mode: 'HTML' });
+});
+
+bot.command('resize', async (ctx) => {
+  const { target, targetName, ambiguous, rest } = resolveTargetSession(ctx, ctx.message?.text || '', 'resize');
+  if (ambiguous) {
+    await ctx.reply('Both shell and Claude PTY are running. Use /resize shell <cols> [rows] or /resize claude <cols> [rows].');
+    return;
+  }
+  if (!target?.running) {
+    await ctx.reply('No active PTY target. Start /claude or /sh first.');
+    return;
+  }
+
+  const [colsRaw, rowsRaw] = rest.trim().split(/\s+/);
+  const cols = parseBoundedInteger(colsRaw, { min: 20, max: 160 });
+  const rows = rowsRaw ? parseBoundedInteger(rowsRaw, { min: 10, max: 80 }) : target.rows;
+  if (!cols || !rows) {
+    await ctx.reply('Usage: /resize [shell|claude] <cols> [rows]\nExample: /resize claude 54');
+    return;
+  }
+
+  target.resize({ cols, rows });
+  await renderSession(ctx, target, true);
+  await ctx.reply(`${targetName || target.kind} PTY resized to ${cols}x${rows}.`);
 });
 
 bot.command('type', async (ctx) => {
