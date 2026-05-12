@@ -145,7 +145,7 @@ export function loadConfig({ requireToken = true } = {}) {
     ptyImageTheme: parseEnum('PTY_IMAGE_THEME', 'light', ['light', 'dark']),
     ptyImageFontSize: parseInteger('PTY_IMAGE_FONT_SIZE', 20, { min: 10, max: 48 }),
     ptyScreenLines: parseInteger('PTY_SCREEN_LINES', 80, { min: 5, max: 500 }),
-    ptyRows: parseInteger('PTY_ROWS', 30, { min: 10, max: 80 }),
+    ptyRows: parseInteger('PTY_ROWS', 20, { min: 10, max: 80 }),
     ptyCols: parseInteger('PTY_COLS', 54, { min: 20, max: 160 }),
     ptyIdleTimeoutMs: parseInteger('PTY_IDLE_TIMEOUT_MS', 30 * 60 * 1000, { min: 0 }),
     ptyHardTimeoutMs: parseInteger('PTY_HARD_TIMEOUT_MS', 0, { min: 0 }),

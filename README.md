@@ -36,7 +36,7 @@ Edit `.env` before starting the bot:
 - `PTY_IMAGE_THEME`: `light` or `dark` image theme.
 - `PTY_IMAGE_FONT_SIZE`: font size for rendered PTY images.
 - `PTY_SCREEN_LINES`: number of terminal output lines retained in Telegram.
-- `PTY_ROWS` and `PTY_COLS`: terminal size exposed to PTY programs; the default 54 columns is tuned for Telegram mobile readability.
+- `PTY_ROWS` and `PTY_COLS`: terminal size exposed to PTY programs; the default 54x20 size is tuned for Telegram mobile readability.
 - `PTY_IDLE_TIMEOUT_MS`: idle timeout for PTY sessions.
 - `PTY_HARD_TIMEOUT_MS`: hard timeout for PTY sessions; `0` disables it.
 - `ENABLE_SHELL_COMMANDS`: enables `/sh <command>` when set to `true`.
@@ -55,6 +55,8 @@ Review `ALLOWED_WORKSPACES` carefully before exposing the bot. Telegram users wi
 PTY mode makes Telegram bot access equivalent to interactive terminal access on the host user account. `/sh` is disabled by default; enabling it allows arbitrary shell commands from Telegram.
 
 By default, PTY output is rendered as a PNG terminal screen and sent as a Telegram photo. Telegram scales the image to the current client width, which keeps cursor-positioned interfaces such as Claude Code readable on mobile. Set `PTY_OUTPUT_MODE=text` to use copyable Telegram preformatted text instead, or use `/screen-text` for a one-off copyable snapshot.
+
+Image mode preserves the terminal layout that Claude Code renders. `PTY_COLS` controls horizontal layout, while `PTY_ROWS` controls image height and vertical spacing; lower rows are usually better for Telegram mobile.
 
 ## Run
 
