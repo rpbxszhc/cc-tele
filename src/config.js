@@ -38,6 +38,14 @@ function parseBoolean(name, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
 }
 
+function parseEnum(name, fallback, values) {
+  const raw = process.env[name] || fallback;
+  if (!values.includes(raw)) {
+    throw new Error(`${name} must be one of: ${values.join(', ')}`);
+  }
+  return raw;
+}
+
 function splitList(value) {
   return (value ?? '')
     .split(',')
@@ -133,6 +141,9 @@ export function loadConfig({ requireToken = true } = {}) {
     enablePty: parseBoolean('ENABLE_PTY', true),
     enableShellCommands: parseBoolean('ENABLE_SHELL_COMMANDS', false),
     ptyOutputIntervalMs: parseInteger('PTY_OUTPUT_INTERVAL_MS', 1200, { min: 250 }),
+    ptyOutputMode: parseEnum('PTY_OUTPUT_MODE', 'image', ['image', 'text']),
+    ptyImageTheme: parseEnum('PTY_IMAGE_THEME', 'light', ['light', 'dark']),
+    ptyImageFontSize: parseInteger('PTY_IMAGE_FONT_SIZE', 20, { min: 10, max: 48 }),
     ptyScreenLines: parseInteger('PTY_SCREEN_LINES', 80, { min: 5, max: 500 }),
     ptyRows: parseInteger('PTY_ROWS', 30, { min: 10, max: 80 }),
     ptyCols: parseInteger('PTY_COLS', 54, { min: 20, max: 160 }),
@@ -152,7 +163,10 @@ export function formatConfigSummary(config) {
     `permission mode: ${config.claudePermissionMode}`,
     `timeout ms: ${config.claudeTimeoutMs}`,
     `pty: ${config.enablePty ? 'enabled' : 'disabled'}`,
+    `pty output mode: ${config.ptyOutputMode}`,
     `pty output interval ms: ${config.ptyOutputIntervalMs}`,
+    `pty image theme: ${config.ptyImageTheme}`,
+    `pty image font size: ${config.ptyImageFontSize}`,
     `pty screen lines: ${config.ptyScreenLines}`,
     `pty size: ${config.ptyCols}x${config.ptyRows}`,
     `pty idle timeout ms: ${config.ptyIdleTimeoutMs}`,

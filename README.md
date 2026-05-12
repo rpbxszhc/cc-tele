@@ -31,7 +31,10 @@ Edit `.env` before starting the bot:
 - `ALLOWED_WORKSPACES`: comma-separated allowlist for `/cwd`; `*` expands one directory level.
 - `CLAUDE_PERMISSION_MODE`: defaults to `auto`.
 - `ENABLE_PTY`: enables PTY-backed shell and Claude sessions.
+- `PTY_OUTPUT_MODE`: `image` renders PTY screens as PNG photos; `text` uses Telegram preformatted text.
 - `PTY_OUTPUT_INTERVAL_MS`: throttle interval for Telegram message edits.
+- `PTY_IMAGE_THEME`: `light` or `dark` image theme.
+- `PTY_IMAGE_FONT_SIZE`: font size for rendered PTY images.
 - `PTY_SCREEN_LINES`: number of terminal output lines retained in Telegram.
 - `PTY_ROWS` and `PTY_COLS`: terminal size exposed to PTY programs; the default 54 columns is tuned for Telegram mobile readability.
 - `PTY_IDLE_TIMEOUT_MS`: idle timeout for PTY sessions.
@@ -51,7 +54,7 @@ Review `ALLOWED_WORKSPACES` carefully before exposing the bot. Telegram users wi
 
 PTY mode makes Telegram bot access equivalent to interactive terminal access on the host user account. `/sh` is disabled by default; enabling it allows arbitrary shell commands from Telegram.
 
-PTY output is rendered as a terminal screen and sent in a Telegram preformatted block. This keeps cursor-positioned interfaces such as Claude Code much more readable than appending raw PTY output, though complex full-screen TUIs may still be easier to use from a real terminal. If the Claude Code interface wraps badly on a narrow client, use a smaller width such as `/resize claude 54` and restart Claude later with a matching `PTY_COLS` value.
+By default, PTY output is rendered as a PNG terminal screen and sent as a Telegram photo. Telegram scales the image to the current client width, which keeps cursor-positioned interfaces such as Claude Code readable on mobile. Set `PTY_OUTPUT_MODE=text` to use copyable Telegram preformatted text instead, or use `/screen-text` for a one-off copyable snapshot.
 
 ## Run
 
@@ -90,7 +93,8 @@ loginctl enable-linger "$USER"
 - `/claude` starts an interactive Claude Code PTY.
 - `/ask <prompt>` sends a prompt plus Enter to the Claude PTY.
 - `/sh <command>` runs a shell command in the current chat cwd when enabled.
-- `/screen [shell|claude]` sends the latest PTY screen as a new message.
+- `/screen [shell|claude]` sends the latest PTY screen as a new image or text message, matching `PTY_OUTPUT_MODE`.
+- `/screen-text [shell|claude]` sends the latest PTY screen as copyable text.
 - `/resize [shell|claude] <cols> [rows]` resizes a running PTY.
 - `/type [shell|claude] <text>` sends raw text to a PTY session.
 - `/key [shell|claude] <key>` sends a terminal key such as `enter`, `tab`, `ctrl-c`, `ctrl-d`, arrows, or `backspace`.

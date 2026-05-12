@@ -24,6 +24,62 @@ function childEnv(extra = {}) {
   return env;
 }
 
+function charWidth(char) {
+  const code = char.codePointAt(0) || 0;
+  if (
+    code >= 0x1100 && (
+      code <= 0x115f ||
+      code === 0x2329 ||
+      code === 0x232a ||
+      (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
+      (code >= 0xac00 && code <= 0xd7a3) ||
+      (code >= 0xf900 && code <= 0xfaff) ||
+      (code >= 0xfe10 && code <= 0xfe19) ||
+      (code >= 0xfe30 && code <= 0xfe6f) ||
+      (code >= 0xff00 && code <= 0xff60) ||
+      (code >= 0xffe0 && code <= 0xffe6) ||
+      (code >= 0x20000 && code <= 0x3fffd)
+    )
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+function lineWidth(chars) {
+  return chars.reduce((total, char) => total + charWidth(char), 0);
+}
+
+function indexForColumn(chars, column) {
+  let current = 0;
+  for (let index = 0; index < chars.length; index += 1) {
+    const next = current + charWidth(chars[index]);
+    if (current >= column || next > column) return index;
+    current = next;
+  }
+  return chars.length;
+}
+
+function sliceColumns(line, start, end = Infinity) {
+  let current = 0;
+  let result = '';
+  for (const char of Array.from(line)) {
+    const next = current + charWidth(char);
+    if (next <= start) {
+      current = next;
+      continue;
+    }
+    if (current >= end) break;
+    if (current >= start && next <= end) {
+      result += char;
+    } else {
+      result += ' '.repeat(Math.max(1, Math.min(next, end) - Math.max(current, start)));
+    }
+    current = next;
+  }
+  return result;
+}
+
 class TerminalScreen {
   constructor({ rows = 30, cols = 100, maxLines = 80 } = {}) {
     this.rows = rows;
@@ -142,10 +198,11 @@ class TerminalScreen {
   #putChar(char) {
     this.#ensureLine();
     const chars = Array.from(this.lines[this.row]);
-    while (chars.length < this.col) chars.push(' ');
-    chars[this.col] = char;
+    while (lineWidth(chars) < this.col) chars.push(' ');
+    const index = indexForColumn(chars, this.col);
+    chars[index] = char;
     this.lines[this.row] = chars.join('');
-    this.col += 1;
+    this.col += charWidth(char);
     if (this.col >= this.cols) {
       this.col = 0;
       this.row += 1;
@@ -215,24 +272,23 @@ class TerminalScreen {
       return;
     }
     if (mode === 0) {
-      this.lines[this.row] = Array.from(this.lines[this.row]).slice(0, this.col).join('');
+      this.lines[this.row] = sliceColumns(this.lines[this.row], 0, this.col);
       this.lines.splice(this.row + 1);
     } else if (mode === 1) {
       for (let index = 0; index < this.row; index += 1) this.lines[index] = '';
-      this.lines[this.row] = Array.from(this.lines[this.row]).slice(this.col).join('');
+      this.lines[this.row] = sliceColumns(this.lines[this.row], this.col);
     }
   }
 
   #eraseLine(mode) {
     this.#ensureLine();
-    const chars = Array.from(this.lines[this.row]);
     if (mode === 2) {
       this.lines[this.row] = '';
     } else if (mode === 1) {
-      this.lines[this.row] = chars.slice(this.col).join('');
+      this.lines[this.row] = sliceColumns(this.lines[this.row], this.col);
       this.col = 0;
     } else {
-      this.lines[this.row] = chars.slice(0, this.col).join('');
+      this.lines[this.row] = sliceColumns(this.lines[this.row], 0, this.col);
     }
   }
 }
@@ -256,6 +312,7 @@ export class PtySession extends EventEmitter {
     this.screen = '';
     this.exitInfo = null;
     this.messageId = null;
+    this.messageKind = null;
     this.renderTimer = null;
     this.idleTimer = null;
     this.hardTimer = null;

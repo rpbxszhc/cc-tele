@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { Telegraf } from 'telegraf';
+import { Input, Telegraf } from 'telegraf';
 import { loadConfig, formatConfigSummary } from './config.js';
 import { StateStore } from './state-store.js';
 import { listWorkspaces, resolveAllowedWorkspace } from './workspaces.js';
@@ -8,6 +8,7 @@ import {
   createShellPty,
   supportedKeys,
 } from './pty-session.js';
+import { renderTerminalImage } from './pty-renderer.js';
 import { sanitizeOutput } from './messages.js';
 
 const checkConfig = process.argv.includes('--check-config');
@@ -80,6 +81,58 @@ function sessionText(session) {
   return `<pre>${escapeHtml(sessionPlainText(session))}</pre>`;
 }
 
+async function sendTextSession(ctx, session, { forceNew = false } = {}) {
+  const text = sessionText(session);
+  try {
+    if (session.messageId && session.messageKind === 'text' && !forceNew) {
+      await ctx.telegram.editMessageText(ctx.chat.id, session.messageId, undefined, text, { parse_mode: 'HTML' });
+    } else {
+      const message = await ctx.reply(text, { parse_mode: 'HTML' });
+      session.messageId = message.message_id;
+      session.messageKind = 'text';
+    }
+  } catch {
+    const message = await ctx.reply(text, { parse_mode: 'HTML' });
+    session.messageId = message.message_id;
+    session.messageKind = 'text';
+  }
+}
+
+async function sendImageSession(ctx, session, { forceNew = false } = {}) {
+  const image = await renderTerminalImage(sessionPlainText(session), config);
+  const photo = Input.fromBuffer(image, `${session.kind}-screen.png`);
+  try {
+    if (session.messageId && session.messageKind === 'photo' && !forceNew) {
+      await ctx.telegram.editMessageMedia(ctx.chat.id, session.messageId, undefined, {
+        type: 'photo',
+        media: photo,
+      });
+    } else {
+      const message = await ctx.replyWithPhoto(photo);
+      session.messageId = message.message_id;
+      session.messageKind = 'photo';
+    }
+  } catch {
+    const replacement = Input.fromBuffer(image, `${session.kind}-screen.png`);
+    const message = await ctx.replyWithPhoto(replacement);
+    session.messageId = message.message_id;
+    session.messageKind = 'photo';
+  }
+}
+
+async function sendSession(ctx, session, options = {}) {
+  if (config.ptyOutputMode === 'text') {
+    await sendTextSession(ctx, session, options);
+    return;
+  }
+  try {
+    await sendImageSession(ctx, session, options);
+  } catch (error) {
+    console.error(`failed to render PTY image, falling back to text: ${error.message}`);
+    await sendTextSession(ctx, session, { ...options, forceNew: true });
+  }
+}
+
 async function renderSession(ctx, session, force = false) {
   if (force && session.renderTimer) {
     clearTimeout(session.renderTimer);
@@ -89,17 +142,10 @@ async function renderSession(ctx, session, force = false) {
   const delay = force ? 0 : config.ptyOutputIntervalMs;
   session.renderTimer = setTimeout(async () => {
     session.renderTimer = null;
-    const text = sessionText(session);
     try {
-      if (session.messageId) {
-        await ctx.telegram.editMessageText(ctx.chat.id, session.messageId, undefined, text, { parse_mode: 'HTML' });
-      } else {
-        const message = await ctx.reply(text, { parse_mode: 'HTML' });
-        session.messageId = message.message_id;
-      }
-    } catch {
-      const message = await ctx.reply(text, { parse_mode: 'HTML' });
-      session.messageId = message.message_id;
+      await sendSession(ctx, session);
+    } catch (error) {
+      console.error(`failed to render PTY session: ${error.message}`);
     }
   }, delay);
   session.renderTimer.unref();
@@ -115,8 +161,7 @@ async function attachSession(ctx, session) {
   session.on('error', async (error) => {
     await ctx.reply(`PTY error: ${error.message}`);
   });
-  const message = await ctx.reply(sessionText(session), { parse_mode: 'HTML' });
-  session.messageId = message.message_id;
+  await sendSession(ctx, session, { forceNew: true });
 }
 
 function stopSession(session) {
@@ -171,6 +216,7 @@ function helpText(ctx) {
     '',
     `Current cwd: ${chat.cwd}`,
     `PTY: ${config.enablePty ? 'enabled' : 'disabled'}`,
+    `PTY output: ${config.ptyOutputMode}`,
     `Shell commands: ${config.enableShellCommands ? 'enabled' : 'disabled'}`,
     '',
     '/start - Show bridge status.',
@@ -184,6 +230,7 @@ function helpText(ctx) {
     '/ask <prompt> - Send a prompt plus Enter to Claude PTY.',
     '/sh <command> - Run a shell command in a shell PTY when enabled.',
     '/screen [shell|claude] - Send the latest PTY screen as a new message.',
+    '/screen-text [shell|claude] - Send the latest PTY screen as copyable text.',
     '/resize [shell|claude] <cols> [rows] - Resize a running PTY.',
     '/type [shell|claude] <text> - Send raw text to a PTY.',
     '/key [shell|claude] <key> - Send a terminal key.',
@@ -338,6 +385,19 @@ bot.command('screen', async (ctx) => {
   }
   if (!target) {
     await ctx.reply('No PTY target found. Use /screen shell or /screen claude after starting a session.');
+    return;
+  }
+  await sendSession(ctx, target, { forceNew: true });
+});
+
+bot.command('screen-text', async (ctx) => {
+  const { target, ambiguous } = resolveTargetSession(ctx, ctx.message?.text || '', 'screen-text');
+  if (ambiguous) {
+    await ctx.reply('Both shell and Claude PTY are running. Use /screen-text shell or /screen-text claude.');
+    return;
+  }
+  if (!target) {
+    await ctx.reply('No PTY target found. Use /screen-text shell or /screen-text claude after starting a session.');
     return;
   }
   await ctx.reply(sessionText(target), { parse_mode: 'HTML' });
